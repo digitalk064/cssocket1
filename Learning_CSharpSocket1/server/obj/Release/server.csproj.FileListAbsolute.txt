@@ -1,0 +1,6 @@
+D:\GitHub\Private\cssocket1\Learning_CSharpSocket1\server\bin\Release\server.exe.config
+D:\GitHub\Private\cssocket1\Learning_CSharpSocket1\server\bin\Release\server.exe
+D:\GitHub\Private\cssocket1\Learning_CSharpSocket1\server\bin\Release\server.pdb
+D:\GitHub\Private\cssocket1\Learning_CSharpSocket1\server\obj\Release\server.csprojAssemblyReference.cache
+D:\GitHub\Private\cssocket1\Learning_CSharpSocket1\server\obj\Release\server.exe
+D:\GitHub\Private\cssocket1\Learning_CSharpSocket1\server\obj\Release\server.pdb

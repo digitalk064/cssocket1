@@ -1,0 +1,5 @@
+D:\GitHub\Private\cssocket1\Learning_CSharpSocket1\client\bin\Release\client.exe.config
+D:\GitHub\Private\cssocket1\Learning_CSharpSocket1\client\bin\Release\client.exe
+D:\GitHub\Private\cssocket1\Learning_CSharpSocket1\client\bin\Release\client.pdb
+D:\GitHub\Private\cssocket1\Learning_CSharpSocket1\client\obj\Release\client.exe
+D:\GitHub\Private\cssocket1\Learning_CSharpSocket1\client\obj\Release\client.pdb
