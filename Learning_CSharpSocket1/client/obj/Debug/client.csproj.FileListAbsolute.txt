@@ -1,6 +1,0 @@
-D:\GitHub\Private\cssocket1\Learning_CSharpSocket1\client\bin\Debug\client.exe.config
-D:\GitHub\Private\cssocket1\Learning_CSharpSocket1\client\bin\Debug\client.exe
-D:\GitHub\Private\cssocket1\Learning_CSharpSocket1\client\bin\Debug\client.pdb
-D:\GitHub\Private\cssocket1\Learning_CSharpSocket1\client\obj\Debug\client.csprojAssemblyReference.cache
-D:\GitHub\Private\cssocket1\Learning_CSharpSocket1\client\obj\Debug\client.exe
-D:\GitHub\Private\cssocket1\Learning_CSharpSocket1\client\obj\Debug\client.pdb

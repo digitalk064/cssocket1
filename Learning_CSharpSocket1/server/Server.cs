@@ -50,7 +50,7 @@ namespace server
                         //bruh there's another Socket
                         curHandler = listener.Accept();
 
-                        Console.WriteLine("A client connected");
+                        Console.WriteLine("A cliesnt connected");
 
                         while (true)
                         {

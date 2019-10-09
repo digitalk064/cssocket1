@@ -1,5 +1,0 @@
-D:\GitHub\Private\cssocket1\Learning_CSharpSocket1\server\bin\Debug\server.exe.config
-D:\GitHub\Private\cssocket1\Learning_CSharpSocket1\server\bin\Debug\server.exe
-D:\GitHub\Private\cssocket1\Learning_CSharpSocket1\server\bin\Debug\server.pdb
-D:\GitHub\Private\cssocket1\Learning_CSharpSocket1\server\obj\Debug\server.exe
-D:\GitHub\Private\cssocket1\Learning_CSharpSocket1\server\obj\Debug\server.pdb
