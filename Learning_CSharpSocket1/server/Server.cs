@@ -69,7 +69,7 @@ namespace server
                                 }
                             }
                             if(!string.IsNullOrEmpty(data))
-                                Console.WriteLine("Client's message: {0}", data);
+                                Console.WriteLine("Client's messsage: {0}", data);
 
                             //Send our own message back
                             byte[] msg = Encoding.ASCII.GetBytes(DateTime.Now.ToString() + ": ACKNOWLEDGED"); //Compose it

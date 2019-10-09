@@ -69,10 +69,10 @@ namespace client
                 //Now we connect
                 try //There's never enough try-catch
                 {
+                    BackgroundRun();
+
                     curSocket.Connect(remoteEP); //Connect to the destination
                     Console.WriteLine("Socket connected to: {0}", curSocket.RemoteEndPoint.ToString());
-
-                    BackgroundRun();
 
                     while (!stopFlag)
                     {
