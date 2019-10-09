@@ -13,6 +13,12 @@ namespace server
             return 0;
         }
 
+        private static bool IsClientConnected()
+        {
+            return !(curHandler.Poll(1, SelectMode.SelectRead) && curHandler.Available == 0);
+        }
+
+        static Socket curHandler;
         public static string data = null; //Incoming data
 
         static void StartListening()
@@ -39,32 +45,44 @@ namespace server
                 while (true)
                 {
                     Console.WriteLine("Waiting for connection. Program will hang");
-                    //bruh there's another listener
-                    Socket handler = listener.Accept();
-                    data = null;
-
-                    //Process incoming connection
-                    while(true) //Wait why doesn't the client have this loop?
+                    try
                     {
-                        int bytesRec = handler.Receive(bytes);
-                        Console.WriteLine("Bytes fragment received");
-                        data += Encoding.ASCII.GetString(bytes, 0, bytesRec);
-                        //Th is wil l add up th e mes sage s slo w ly
-                        if(data.IndexOf("<EOF>") > -1)
+                        //bruh there's another Socket
+                        curHandler = listener.Accept();
+
+                        Console.WriteLine("A client connected");
+
+                        while (true)
                         {
-                            break; //Stop expecting message
+                            data = null;
+
+                            //Process incoming connection
+                            while (true && IsClientConnected()) //Wait why doesn't the client have this loop?
+                            {
+                                int bytesRec = curHandler.Receive(bytes);
+                                //Console.WriteLine("Bytes fragment received");
+                                data += Encoding.ASCII.GetString(bytes, 0, bytesRec);
+                                //Th is wil l add up th e mes sage s slo w ly
+                                if (data.IndexOf("<EOF>") > -1)
+                                {
+                                    break; //Stop expecting message
+                                }
+                            }
+                            if(!string.IsNullOrEmpty(data))
+                                Console.WriteLine("Client's message: {0}", data);
+
+                            //Send our own message back
+                            byte[] msg = Encoding.ASCII.GetBytes(DateTime.Now.ToString() + ": ACKNOWLEDGED"); //Compose it
+                            curHandler.Send(msg); //Send it
                         }
                     }
-
-                    Console.WriteLine("Final message: {0}", data);
-
-                    //Send our own message back
-                    byte[] msg = Encoding.ASCII.GetBytes("Right back at ya buckaroo"); //Compose it
-                    handler.Send(msg); //Send it
-
+                    catch(Exception e)
+                    {
+                        Console.WriteLine("Exception! Maybe client disconnected? {0}", e.ToString());
+                    }
                     //i sleep now
-                    handler.Shutdown(SocketShutdown.Both);
-                    handler.Close();
+                    //handler.Shutdown(SocketShutdown.Both);
+                    //handler.Close();
                 }
             }
             catch(Exception e)
