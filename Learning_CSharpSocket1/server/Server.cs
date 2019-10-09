@@ -1,25 +1,31 @@
 ﻿//Coded by Le Vu Nguyen Khanh, October 2019
 //Part of projects to learn socket programming
-//This is a very simple server that can receive message from the client
-//and send back a single message. Can also detect when a client disconnects.
-//To enable the server to send user-input
-//messages, it seems like I need to use asynchronous stuff.
-//That will be in the next version.
+//This is the server part of a very simple system that enables
+//two-way communication with user-input messages (like chatting)
 using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 
 namespace server
 {
     class Server
     {
+        static Socket curHandler;
+        static List<Socket> sockets = new List<Socket>();
+        public static string data = null; //Incoming data
+        private static bool stopFlag = false;
+        private static Thread inputThread;
+        private static Thread outputThread;
         public static int Main(string[] args)
         {
             StartListening();
             return 0;
         }
+        //Takes care of updating the title
         private static async Task BackgroundRun()
         {
             while (curHandler == null || !curHandler.Connected)
@@ -29,26 +35,123 @@ namespace server
             }
             while (true)
             {
-                if (!IsClientConnected())
+                if (!IsClientConnected(sockets[0]))
                     Console.Title = "<SERVER>No Connection Active " + DateTime.Now.ToLongTimeString();
                 else
                     Console.Title = "<SERVER>Connection Active " + DateTime.Now.ToLongTimeString();
                 await Task.Delay(1000);
             }
         }
-
-        private static bool IsClientConnected()
+        private static void InputThread()
         {
-            return !(curHandler.Poll(1, SelectMode.SelectRead) && curHandler.Available == 0);
-        }
+            while (!stopFlag)
+            {
+                //Encode message
+                string sMsg = DateTime.Now.ToString();
 
-        static Socket curHandler;
-        public static string data = null; //Incoming data
-        private static bool stopFlag = false;
+                Console.WriteLine("Please input your message. Enter nothing to disconnect");
+                string userMsg = Console.ReadLine();
+                if (string.IsNullOrEmpty(userMsg))
+                {
+                    stopFlag = true;
+                    userMsg = "<Goodbye message>";
+                }
+
+                sMsg += ": " + userMsg;
+                byte[] msg = Encoding.ASCII.GetBytes(sMsg + "<EOF>");
+
+                //Send the data through the socket
+                for (int i = 0; i < sockets.Count; i++)
+                {
+                    int bytesSent = sockets[i].Send(msg);
+                }
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("You: " + sMsg);
+                Console.ResetColor();
+            }
+            inputThread.Abort();
+        }
+        private static void StartInputListener()
+        {
+            /*
+            inputThread = new Thread(() =>
+            {
+                while (!stopFlag)
+                {
+                    //Encode message
+                    string sMsg = DateTime.Now.ToString();
+
+                    Console.WriteLine("Please input your message. Enter nothing to disconnect");
+                    string userMsg = Console.ReadLine();
+                    if (string.IsNullOrEmpty(userMsg))
+                    {
+                        stopFlag = true;
+                        userMsg = "<Goodbye message>";
+                    }
+
+                    sMsg += ": " + userMsg;
+                    byte[] msg = Encoding.ASCII.GetBytes(sMsg + "<EOF>");
+
+                    //Send the data through the socket
+                    int bytesSent = curHandler.Send(msg);
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine("You: ");
+                    Console.ResetColor();
+                }
+                inputThread.Abort();
+            }
+            );
+            */
+            inputThread = new Thread(Server.InputThread);
+            inputThread.IsBackground = true;
+            inputThread.Start();
+        }
+        private static void OutputThread()
+        {
+            byte[] bytes = new byte[1024]; //Incoming bytes
+            while (!stopFlag)
+            {
+                for (int i = 0; i < sockets.Count; i++)
+                {
+                    data = null;
+
+                    //Process incoming connection
+                    while (IsClientConnected(sockets[i])) //Wait why doesn't the client have this loop?
+                    {
+                        int bytesRec = sockets[i].Receive(bytes);
+                        //Console.WriteLine("Bytes fragment received");
+                        data += Encoding.ASCII.GetString(bytes, 0, bytesRec);
+                        //Th is wil l add up th e mes sage s slo w ly
+                        if (data.IndexOf("<EOF>") > -1)
+                        {
+                            break; //Stop expecting message
+                        }
+                    }
+                    if (!string.IsNullOrEmpty(data))
+                    {
+                        Console.ForegroundColor = ConsoleColor.Blue;
+                        Console.WriteLine("Client's messsage: {0}", data);
+                        Console.ResetColor();
+                    }
+                }
+            }
+            outputThread.Abort();
+        }
+        private static void StartOutputListener()
+        {
+            outputThread = new Thread(Server.OutputThread);
+            outputThread.IsBackground = true;
+            outputThread.Start();
+        }
+        private static bool IsClientConnected(Socket client)
+        {
+            if (client == null)
+                return false;
+            return !(client.Poll(1, SelectMode.SelectRead) && client.Available == 0);
+        }
 
         static void StartListening()
         {
-            byte[] bytes = new byte[1024]; //Incoming bytes
 
             //Interesting, no try-catch needed here?
 
@@ -74,40 +177,15 @@ namespace server
                     {
                         //bruh there's another Socket
                         curHandler = listener.Accept();
-
-                        Console.WriteLine("A cliesnt connected");
-
-                        while (true)
-                        {
-                            data = null;
-
-                            //Process incoming connection
-                            while (true && IsClientConnected()) //Wait why doesn't the client have this loop?
-                            {
-                                int bytesRec = curHandler.Receive(bytes);
-                                //Console.WriteLine("Bytes fragment received");
-                                data += Encoding.ASCII.GetString(bytes, 0, bytesRec);
-                                //Th is wil l add up th e mes sage s slo w ly
-                                if (data.IndexOf("<EOF>") > -1)
-                                {
-                                    break; //Stop expecting message
-                                }
-                            }
-                            if(!string.IsNullOrEmpty(data))
-                                Console.WriteLine("Client's messsage: {0}", data);
-
-                            //Send our own message back
-                            byte[] msg = Encoding.ASCII.GetBytes(DateTime.Now.ToString() + ": ACKNOWLEDGED"); //Compose it
-                            curHandler.Send(msg); //Send it
-                        }
+                        sockets.Add(curHandler);
+                        Console.WriteLine("A client connected");
+                        StartInputListener();
+                        StartOutputListener();
                     }
                     catch(Exception e)
                     {
                         Console.WriteLine("Exception! Maybe client disconnected? {0}", e.ToString());
                     }
-                    //i sleep now
-                    //handler.Shutdown(SocketShutdown.Both);
-                    //handler.Close();
                 }
             }
             catch(Exception e)

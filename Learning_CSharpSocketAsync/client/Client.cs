@@ -2,6 +2,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Text;
 
 namespace client
@@ -22,7 +23,7 @@ namespace client
     {
         // The port number for the remote device.  
         private const int port = 11000;
-
+        
         // ManualResetEvent instances signal completion.  
         private static ManualResetEvent connectDone =
             new ManualResetEvent(false);
@@ -34,7 +35,17 @@ namespace client
         // The response from the remote device.  
         private static String response = String.Empty;
 
-        private static void StartClient()
+        //The socket
+        private static Socket client;
+        private static async Task LoopSend()
+        {
+            while(true)
+            {
+                Send(client, "Loop<EOF>");
+                await Task.Delay(1000);
+            }
+        }
+        private static async Task StartClient()
         {
             // Connect to a remote device.  
             try
@@ -47,7 +58,7 @@ namespace client
                 IPEndPoint remoteEP = new IPEndPoint(ipAddress, port);
 
                 // Create a TCP/IP socket.  
-                Socket client = new Socket(ipAddress.AddressFamily,
+                client = new Socket(ipAddress.AddressFamily,
                     SocketType.Stream, ProtocolType.Tcp);
 
                 // Connect to the remote endpoint.  
@@ -65,10 +76,10 @@ namespace client
 
                 // Write the response to the console.  
                 Console.WriteLine("Response received : {0}", response);
-
+                await LoopSend();
                 // Release the socket.  
-                client.Shutdown(SocketShutdown.Both);
-                client.Close();
+                //client.Shutdown(SocketShutdown.Both);
+                //client.Close();
 
             }
             catch (Exception e)

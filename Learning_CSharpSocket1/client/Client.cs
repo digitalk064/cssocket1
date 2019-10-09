@@ -1,14 +1,12 @@
 ﻿//Coded by Le Vu Nguyen Khanh, October 2019
 //Part of projects to learn socket programming
-//This is a very simple client that can send user-input messages to the server
-//and receive messages from it. Can also detect disconnection.
-//To enable both sides to simultaneously send and receive
-//messages, it seems like I need to use asynchronous stuff.
-//That will be in the next version.
+//This is the client part of a very simple system that enables
+//two-way communication with user-input messages (like chatting)
 using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 
@@ -26,6 +24,8 @@ namespace client
         static Socket curSocket;
         
         static bool stopFlag = false;
+        private static Thread inputThread;
+
         public static int Main(string[] args)
         {
             RunClient();
@@ -57,6 +57,64 @@ namespace client
                 await Task.Delay(1000);
             }
         }
+        private static void InputWork()
+        {
+            while (!stopFlag)
+            {
+                //Encode message
+                string sMsg = DateTime.Now.ToString();
+
+                Console.WriteLine("Please input your message. Enter nothing to disconnect");
+                string userMsg = Console.ReadLine();
+                if (string.IsNullOrEmpty(userMsg))
+                {
+                    stopFlag = true;
+                    userMsg = "<Goodbye message>";
+                }
+
+                sMsg += ": " + userMsg;
+                byte[] msg = Encoding.ASCII.GetBytes(sMsg + "<EOF>");
+
+                //Send the data through the socket
+                int bytesSent = curSocket.Send(msg);
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine("You: " + sMsg);
+                Console.ResetColor();
+            }
+            inputThread.Abort();
+        }
+        private static void StartInputListener()
+        {
+            /*
+            inputThread = new Thread(() =>
+            {
+                while (!stopFlag)
+                {
+                    //Encode message
+                    string sMsg = DateTime.Now.ToString();
+
+                    Console.WriteLine("Please input your message. Enter nothing to disconnect");
+                    string userMsg = Console.ReadLine();
+                    if (string.IsNullOrEmpty(userMsg))
+                    {
+                        stopFlag = true;
+                        userMsg = "<Goodbye message>";
+                    }
+
+                    sMsg += ": " + userMsg;
+                    byte[] msg = Encoding.ASCII.GetBytes(sMsg + "<EOF>");
+
+                    //Send the data through the socket
+                    int bytesSent = curSocket.Send(msg);
+                }
+                inputThread.Abort();
+            }
+            );*/
+            inputThread = new Thread(Client.InputWork);
+            inputThread.IsBackground = true;
+            inputThread.Start();
+        }
+
         static void RunClient()
         {
             byte[] bytes = new byte[1024]; //Bytes received
@@ -80,30 +138,15 @@ namespace client
 
                     curSocket.Connect(remoteEP); //Connect to the destination
                     Console.WriteLine("Socket connected to: {0}", curSocket.RemoteEndPoint.ToString());
-
+                    StartInputListener();
                     while (!stopFlag)
                     {
-                        //Encode message
-                        string sMsg = DateTime.Now.ToString();
-
-                        Console.WriteLine("Please input your message. Enter nothing to disconnect");
-                        string userMsg = Console.ReadLine();
-                        if (string.IsNullOrEmpty(userMsg))
-                        {
-                            stopFlag = true;
-                            userMsg = "<Goodbye message>";
-                        }
-
-                        sMsg += ": " + userMsg;
-                        byte[] msg = Encoding.ASCII.GetBytes(sMsg + "<EOF>");
-
-                        //Send the data through the socket
-                        int bytesSent = curSocket.Send(msg);
-
                         //Receive the response
                         int bytesRec = curSocket.Receive(bytes);
-                        Console.WriteLine("Incoming msg: {0}",
+                        Console.ForegroundColor = ConsoleColor.Blue;
+                        Console.WriteLine("Server's message: {0}",
                             Encoding.ASCII.GetString(bytes, 0, bytesRec));
+                        Console.ResetColor();
                     }
                     //Release the socket
                     curSocket.Shutdown(SocketShutdown.Both);

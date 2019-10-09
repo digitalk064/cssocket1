@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace server
 {
@@ -24,10 +25,17 @@ namespace server
         // Thread signal.  
         public static ManualResetEvent allDone = new ManualResetEvent(false);
 
+        // Variables
+        private static Socket handler;
+
         public AsynchronousSocketListener()
         {
         }
 
+        private static async Task LoopListen()
+        {
+
+        }
         public static void StartListening()
         {
             // Establish the local endpoint for the socket.  
@@ -60,6 +68,17 @@ namespace server
 
                     // Wait until a connection is made before continuing.  
                     allDone.WaitOne();
+                    while(true)
+                    {
+                        //Encode message
+                        string sMsg = DateTime.Now.ToString();
+
+                        Console.WriteLine("Please input your message.");
+                        string userMsg = Console.ReadLine();
+
+                        sMsg += ": " + userMsg;
+                        Send(handler, sMsg);
+                    }
                 }
 
             }
@@ -80,7 +99,7 @@ namespace server
 
             // Get the socket that handles the client request.  
             Socket listener = (Socket)ar.AsyncState;
-            Socket handler = listener.EndAccept(ar);
+            handler = listener.EndAccept(ar);
 
             // Create the state object.  
             StateObject state = new StateObject();
@@ -149,8 +168,8 @@ namespace server
                 int bytesSent = handler.EndSend(ar);
                 Console.WriteLine("Sent {0} bytes to client.", bytesSent);
 
-                handler.Shutdown(SocketShutdown.Both);
-                handler.Close();
+                //handler.Shutdown(SocketShutdown.Both);
+                //handler.Close();
 
             }
             catch (Exception e)
