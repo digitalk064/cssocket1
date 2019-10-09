@@ -1,7 +1,15 @@
-﻿using System;
+﻿//Coded by Le Vu Nguyen Khanh, October 2019
+//Part of projects to learn socket programming
+//This is a very simple server that can receive message from the client
+//and send back a single message. Can also detect when a client disconnects.
+//To enable the server to send user-input
+//messages, it seems like I need to use asynchronous stuff.
+//That will be in the next version.
+using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace server
 {
@@ -12,6 +20,22 @@ namespace server
             StartListening();
             return 0;
         }
+        private static async Task BackgroundRun()
+        {
+            while (curHandler == null || !curHandler.Connected)
+            {
+                Console.Title = "<SERVER>Waiting for first connection " + DateTime.Now.ToLongTimeString();
+                await Task.Delay(1000);
+            }
+            while (true)
+            {
+                if (!IsClientConnected())
+                    Console.Title = "<SERVER>No Connection Active " + DateTime.Now.ToLongTimeString();
+                else
+                    Console.Title = "<SERVER>Connection Active " + DateTime.Now.ToLongTimeString();
+                await Task.Delay(1000);
+            }
+        }
 
         private static bool IsClientConnected()
         {
@@ -20,6 +44,7 @@ namespace server
 
         static Socket curHandler;
         public static string data = null; //Incoming data
+        private static bool stopFlag = false;
 
         static void StartListening()
         {
@@ -40,7 +65,7 @@ namespace server
             {
                 listener.Bind(localEP);
                 listener.Listen(10);
-
+                BackgroundRun();
                 //Start listening 
                 while (true)
                 {

@@ -1,4 +1,11 @@
-﻿using System;
+﻿//Coded by Le Vu Nguyen Khanh, October 2019
+//Part of projects to learn socket programming
+//This is a very simple client that can send user-input messages to the server
+//and receive messages from it. Can also detect disconnection.
+//To enable both sides to simultaneously send and receive
+//messages, it seems like I need to use asynchronous stuff.
+//That will be in the next version.
+using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
