@@ -28,6 +28,7 @@ namespace server
         //Takes care of updating the title
         private static async Task BackgroundRun()
         {
+            ConnectionChecker();
             while (curHandler == null || !curHandler.Connected)
             {
                 Console.Title = "<SERVER>Waiting for first connection " + DateTime.Now.ToLongTimeString();
@@ -40,6 +41,24 @@ namespace server
                 else
                     Console.Title = "<SERVER>Connection Active " + DateTime.Now.ToLongTimeString();
                 await Task.Delay(1000);
+            }
+        }
+        //Frequently check if any client has disconnected
+        private static async Task ConnectionChecker()
+        {
+            while (true)
+            {
+                for (int i = 0; i < sockets.Count; i++)
+                {
+                    if (!IsClientConnected(sockets[i]))
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine("Removing client " + i);
+                        Console.ResetColor();
+                        sockets.RemoveAt(i);
+                    }
+                }
+                await Task.Delay(500);
             }
         }
         private static void InputThread()
@@ -59,11 +78,20 @@ namespace server
 
                 sMsg += ": " + userMsg;
                 byte[] msg = Encoding.ASCII.GetBytes(sMsg + "<EOF>");
-
                 //Send the data through the socket
                 for (int i = 0; i < sockets.Count; i++)
                 {
-                    int bytesSent = sockets[i].Send(msg);
+                    try
+                    {
+                        int bytesSent = sockets[i].Send(msg);
+                    }
+                    catch(Exception e)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine("Removing client " + i);
+                        Console.ResetColor();
+                        sockets.RemoveAt(i);
+                    }
                 }
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine("You: " + sMsg);
@@ -114,24 +142,34 @@ namespace server
                 for (int i = 0; i < sockets.Count; i++)
                 {
                     data = null;
-
-                    //Process incoming connection
-                    while (IsClientConnected(sockets[i])) //Wait why doesn't the client have this loop?
+                    try
                     {
-                        int bytesRec = sockets[i].Receive(bytes);
-                        //Console.WriteLine("Bytes fragment received");
-                        data += Encoding.ASCII.GetString(bytes, 0, bytesRec);
-                        //Th is wil l add up th e mes sage s slo w ly
-                        if (data.IndexOf("<EOF>") > -1)
+                        //Process incoming connection
+                        while (IsClientConnected(sockets[i])) //Wait why doesn't the client have this loop?
                         {
-                            break; //Stop expecting message
+                            int bytesRec = sockets[i].Receive(bytes);
+                            //Console.WriteLine("Bytes fragment received");
+                            data += Encoding.ASCII.GetString(bytes, 0, bytesRec);
+                            //Th is wil l add up th e mes sage s slo w ly
+                            if (data.IndexOf("<EOF>") > -1)
+                            {
+                                break; //Stop expecting message
+                            }
+                        }
+                        if (!string.IsNullOrEmpty(data))
+                        {
+                            Console.ForegroundColor = ConsoleColor.Blue;
+                            Console.WriteLine("Client's messsage: {0}", data);
+                            Console.ResetColor();
                         }
                     }
-                    if (!string.IsNullOrEmpty(data))
+                    catch(Exception e)
                     {
-                        Console.ForegroundColor = ConsoleColor.Blue;
-                        Console.WriteLine("Client's messsage: {0}", data);
+                        //The client most likely disconnected
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine("Removing client " + i);
                         Console.ResetColor();
+                        sockets.RemoveAt(i);
                     }
                 }
             }
@@ -162,7 +200,7 @@ namespace server
 
             //Create TCP/IP socket
             Socket listener = new Socket(ipAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-
+            spot:
             //Now bind the socket to the local endpoint and start listening
             try
             {
@@ -191,6 +229,7 @@ namespace server
             catch(Exception e)
             {
                 Console.WriteLine("Outer error: {0}", e.ToString());
+                goto spot;
             }
 
         }
