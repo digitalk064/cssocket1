@@ -2,6 +2,7 @@
 //Part of projects to learn socket programming
 //This is the client part of a very simple system that enables
 //two-way communication with user-input messages (like chatting)
+//Does not have auto reconnection
 using System;
 using System.Net;
 using System.Net.Sockets;
@@ -23,7 +24,7 @@ namespace client
 
         static Socket curSocket;
         
-        static bool stopFlag = false;
+        static bool stopFlag = false; //More like a pause flag, but whatever
         private static Thread inputThread;
         private static ManualResetEvent disconnect = new ManualResetEvent(false);
         public static int Main(string[] args)
@@ -36,6 +37,7 @@ namespace client
         {
             return !(curSocket.Poll(1, SelectMode.SelectRead) && curSocket.Available == 0);
         }
+        //Takes care of updating the title and checking for unexpected disconnection
         private static async Task BackgroundRun()
         {
             while(!curSocket.Connected)
@@ -48,14 +50,16 @@ namespace client
                 if (!IsConnected()) {
                     var handle = GetStdHandle(STD_INPUT_HANDLE);
                     CancelIoEx(handle, IntPtr.Zero);
+                    Console.Title = "<CLIENT>Server disconnected " + DateTime.Now.ToLongTimeString();
                     break;
                 }
                 if(stopFlag)
                 {
-                    break;
+                    Console.Title += " STOPPED ";
                 }
                 await Task.Delay(1000);
             }
+            disconnect.Set();
         }
         private static void InputWork()
         {
@@ -82,7 +86,7 @@ namespace client
                 }
                 catch(Exception e)
                 {
-                    Console.WriteLine("Connection to server lost: " + e.ToString());
+                    Console.WriteLine("Connection to server lost: " + e.Message);
                 }
             }
         }
@@ -181,6 +185,7 @@ namespace client
                     Console.WriteLine("Socket connected to: {0}", curSocket.RemoteEndPoint.ToString());
                     StartInputListener();
                     StartOutputListener();
+                    //Wait until we want to disconnect
                     disconnect.WaitOne();
                     //Release the socket
                     curSocket.Shutdown(SocketShutdown.Both);
@@ -189,7 +194,7 @@ namespace client
                 }
                 catch(Exception e)
                 {
-                    Console.WriteLine("Unexpected disconnection: {0}", e.ToString());
+                    Console.WriteLine("Connection Error: {0}", e.ToString());
                 }
 
             }

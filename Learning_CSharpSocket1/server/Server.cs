@@ -2,6 +2,7 @@
 //Part of projects to learn socket programming
 //This is the server part of a very simple system that enables
 //two-way communication with user-input messages (like chatting)
+//Does not have auto reconnection
 using System;
 using System.Net;
 using System.Net.Sockets;
@@ -14,6 +15,7 @@ namespace server
 {
     class Server
     {
+        static Socket listener;
         static Socket curHandler;
         static List<Socket> sockets = new List<Socket>();
         static List<Task> tasks = new List<Task>();
@@ -89,6 +91,11 @@ namespace server
                 Console.ForegroundColor = ConsoleColor.Green;
                 Console.WriteLine("You: " + userMsg);
                 Console.ResetColor();
+                if(stopFlag)
+                {
+                    //listener.Disconnect(false);
+                    listener.Close();
+                }
             }
             //inputThread.Abort();
         }
@@ -176,7 +183,7 @@ namespace server
             IPEndPoint localEP = new IPEndPoint(ipAddress, 11000);
 
             //Create TCP/IP socket
-            Socket listener = new Socket(ipAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+            listener = new Socket(ipAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             spot:
             //Now bind the socket to the local endpoint and start listening
             try
@@ -199,9 +206,11 @@ namespace server
                     }
                     catch(Exception e)
                     {
-                        Console.WriteLine("Exception! Maybe client disconnected? {0}", e.ToString());
+                        Console.WriteLine("Exception! Maybe server is closing? {0}", e.Message);
+                        break;
                     }
                 }
+                Console.WriteLine("Finished");
             }
             catch(Exception e)
             {
