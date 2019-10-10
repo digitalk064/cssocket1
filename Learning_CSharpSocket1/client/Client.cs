@@ -25,7 +25,7 @@ namespace client
         
         static bool stopFlag = false;
         private static Thread inputThread;
-
+        private static ManualResetEvent disconnect = new ManualResetEvent(false);
         public static int Main(string[] args)
         {
             RunClient();
@@ -59,29 +59,32 @@ namespace client
         }
         private static void InputWork()
         {
+            Console.WriteLine("Please input your message. Enter nothing to disconnect");
             while (!stopFlag)
             {
-                //Encode message
-                string sMsg = DateTime.Now.ToString();
-
-                Console.WriteLine("Please input your message. Enter nothing to disconnect");
-                string userMsg = Console.ReadLine();
-                if (string.IsNullOrEmpty(userMsg))
+                try
                 {
-                    stopFlag = true;
-                    userMsg = "<Goodbye message>";
+                    //Input message
+                    string userMsg = Console.ReadLine();
+                    if (string.IsNullOrEmpty(userMsg))
+                    {
+                        stopFlag = true;
+                        userMsg = "<BYE>";
+                        disconnect.Set();
+                    }
+                    byte[] msg = Encoding.ASCII.GetBytes(userMsg + "<EOF>");
+
+                    //Send the data through the socket
+                    int bytesSent = curSocket.Send(msg);
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine(DateTime.Now.ToString() + ": You: " + userMsg);
+                    Console.ResetColor();
                 }
-
-                sMsg += ": " + userMsg;
-                byte[] msg = Encoding.ASCII.GetBytes(sMsg + "<EOF>");
-
-                //Send the data through the socket
-                int bytesSent = curSocket.Send(msg);
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("You: " + sMsg);
-                Console.ResetColor();
+                catch(Exception e)
+                {
+                    Console.WriteLine("Connection to server lost: " + e.ToString());
+                }
             }
-            inputThread.Abort();
         }
         private static void StartInputListener()
         {
@@ -114,10 +117,48 @@ namespace client
             inputThread.IsBackground = true;
             inputThread.Start();
         }
-
-        static void RunClient()
+        private static void OutputWork()
         {
             byte[] bytes = new byte[1024]; //Bytes received
+            string data = ""; //Interpreted data
+            while (!stopFlag) {
+                data = "";
+                try
+                {
+                    while (IsConnected()) //Wait why doesn't the client have this loop?
+                    {
+                        int bytesRec = curSocket.Receive(bytes);
+                        //Console.WriteLine("Bytes fragment received");
+                        data += Encoding.ASCII.GetString(bytes, 0, bytesRec);
+                        //Th is wil l add up th e mes sage s slo w ly
+                        int eof = data.IndexOf("<EOF>");
+                        if (eof > -1)
+                        {
+                            //Remove the <EOF> first
+                            data = data.Remove(eof, 5);
+                            break; //Stop expecting message
+                        }
+                    }
+                    if (!string.IsNullOrEmpty(data))
+                    {
+                        Console.ForegroundColor = ConsoleColor.Blue;
+                        Console.WriteLine(DateTime.Now.ToString() + ": Server's messsage: {0}", data);
+                        Console.ResetColor();
+                    }
+                }
+                catch(Exception e)
+                {
+                    //Ignore
+                    break;
+                }
+            }
+        }
+        private static void StartOutputListener()
+        {
+            Task.Run(() => OutputWork());
+        }
+        static async Task RunClient()
+        {
             try
             {
                 //Most of the code here is copied from Microsoft lol
@@ -139,15 +180,8 @@ namespace client
                     curSocket.Connect(remoteEP); //Connect to the destination
                     Console.WriteLine("Socket connected to: {0}", curSocket.RemoteEndPoint.ToString());
                     StartInputListener();
-                    while (!stopFlag)
-                    {
-                        //Receive the response
-                        int bytesRec = curSocket.Receive(bytes);
-                        Console.ForegroundColor = ConsoleColor.Blue;
-                        Console.WriteLine("Server's message: {0}",
-                            Encoding.ASCII.GetString(bytes, 0, bytesRec));
-                        Console.ResetColor();
-                    }
+                    StartOutputListener();
+                    disconnect.WaitOne();
                     //Release the socket
                     curSocket.Shutdown(SocketShutdown.Both);
                     curSocket.Close();

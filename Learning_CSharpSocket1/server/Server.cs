@@ -16,10 +16,9 @@ namespace server
     {
         static Socket curHandler;
         static List<Socket> sockets = new List<Socket>();
-        public static string data = null; //Incoming data
+        static List<Task> tasks = new List<Task>();
         private static bool stopFlag = false;
         private static Thread inputThread;
-        private static Thread outputThread;
         public static int Main(string[] args)
         {
             StartListening();
@@ -36,10 +35,12 @@ namespace server
             }
             while (true)
             {
+                /*
                 if (!IsClientConnected(sockets[0]))
                     Console.Title = "<SERVER>No Connection Active " + DateTime.Now.ToLongTimeString();
                 else
-                    Console.Title = "<SERVER>Connection Active " + DateTime.Now.ToLongTimeString();
+                */
+                Console.Title = String.Format("<SERVER>{0} Connections, {1} Tasks, {2}",sockets.Count, tasks.Count, DateTime.Now.ToLongTimeString());
                 await Task.Delay(1000);
             }
         }
@@ -55,29 +56,24 @@ namespace server
                         Console.ForegroundColor = ConsoleColor.Red;
                         Console.WriteLine("Removing client " + i);
                         Console.ResetColor();
+                        tasks.RemoveAt(i);
                         sockets.RemoveAt(i);
                     }
                 }
-                await Task.Delay(500);
+                await Task.Delay(200);
             }
         }
         private static void InputThread()
         {
             while (!stopFlag)
             {
-                //Encode message
-                string sMsg = DateTime.Now.ToString();
-
-                Console.WriteLine("Please input your message. Enter nothing to disconnect");
                 string userMsg = Console.ReadLine();
                 if (string.IsNullOrEmpty(userMsg))
                 {
                     stopFlag = true;
-                    userMsg = "<Goodbye message>";
+                    userMsg = "<BYE>";
                 }
-
-                sMsg += ": " + userMsg;
-                byte[] msg = Encoding.ASCII.GetBytes(sMsg + "<EOF>");
+                byte[] msg = Encoding.ASCII.GetBytes(userMsg + "<EOF>");
                 //Send the data through the socket
                 for (int i = 0; i < sockets.Count; i++)
                 {
@@ -87,99 +83,74 @@ namespace server
                     }
                     catch(Exception e)
                     {
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine("Removing client " + i);
-                        Console.ResetColor();
-                        sockets.RemoveAt(i);
+                        //The client most likely disconnected
                     }
                 }
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("You: " + sMsg);
+                Console.WriteLine("You: " + userMsg);
                 Console.ResetColor();
             }
-            inputThread.Abort();
+            //inputThread.Abort();
         }
         private static void StartInputListener()
         {
-            /*
-            inputThread = new Thread(() =>
-            {
-                while (!stopFlag)
-                {
-                    //Encode message
-                    string sMsg = DateTime.Now.ToString();
-
-                    Console.WriteLine("Please input your message. Enter nothing to disconnect");
-                    string userMsg = Console.ReadLine();
-                    if (string.IsNullOrEmpty(userMsg))
-                    {
-                        stopFlag = true;
-                        userMsg = "<Goodbye message>";
-                    }
-
-                    sMsg += ": " + userMsg;
-                    byte[] msg = Encoding.ASCII.GetBytes(sMsg + "<EOF>");
-
-                    //Send the data through the socket
-                    int bytesSent = curHandler.Send(msg);
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine("You: ");
-                    Console.ResetColor();
-                }
-                inputThread.Abort();
-            }
-            );
-            */
             inputThread = new Thread(Server.InputThread);
             inputThread.IsBackground = true;
             inputThread.Start();
         }
-        private static void OutputThread()
+        private static void OutputThread(Socket soc, string IP)
         {
             byte[] bytes = new byte[1024]; //Incoming bytes
+            string data; //Interpreted data
             while (!stopFlag)
             {
-                for (int i = 0; i < sockets.Count; i++)
+                data = null;
+                try
                 {
-                    data = null;
-                    try
+                    //Process incoming connection
+                    while (IsClientConnected(soc)) //Wait why doesn't the client have this loop?
                     {
-                        //Process incoming connection
-                        while (IsClientConnected(sockets[i])) //Wait why doesn't the client have this loop?
+                        int bytesRec = soc.Receive(bytes);
+                        //Console.WriteLine("Bytes fragment received");
+                        //Th is wil l add up th e mes sage s slo w ly
+                        data += Encoding.ASCII.GetString(bytes, 0, bytesRec);
+                        if (data.IndexOf("<BYE>") == 0)
                         {
-                            int bytesRec = sockets[i].Receive(bytes);
-                            //Console.WriteLine("Bytes fragment received");
-                            data += Encoding.ASCII.GetString(bytes, 0, bytesRec);
-                            //Th is wil l add up th e mes sage s slo w ly
-                            if (data.IndexOf("<EOF>") > -1)
-                            {
-                                break; //Stop expecting message
-                            }
+                            throw new Exception("Deliberate disconnection");
                         }
-                        if (!string.IsNullOrEmpty(data))
+                        int eof = data.IndexOf("<EOF>");
+                        if (eof > -1)
                         {
-                            Console.ForegroundColor = ConsoleColor.Blue;
-                            Console.WriteLine("Client's messsage: {0}", data);
-                            Console.ResetColor();
+                            //Remove the <EOF> first
+                            data=data.Remove(eof, 5);
+                            break; //Stop expecting message
                         }
                     }
-                    catch(Exception e)
+                    if (!string.IsNullOrEmpty(data))
                     {
-                        //The client most likely disconnected
-                        Console.ForegroundColor = ConsoleColor.Red;
-                        Console.WriteLine("Removing client " + i);
+                        Console.ForegroundColor = ConsoleColor.Blue;
+                        Console.WriteLine(DateTime.Now.ToString() + ": Client {0} messsage: {1}", IP, data);
                         Console.ResetColor();
-                        sockets.RemoveAt(i);
                     }
                 }
+                catch(Exception e)
+                {
+                    Console.WriteLine("A client disconnected: " + e.Message);
+                    break;
+                    //Ignore and stop processing this socket
+                }
             }
-            outputThread.Abort();
         }
-        private static void StartOutputListener()
+        private static void StartOutputListener(Socket soc)
         {
-            outputThread = new Thread(Server.OutputThread);
+            /*
+            Thread outputThread = new Thread(() => Server.OutputThread(soc));
             outputThread.IsBackground = true;
             outputThread.Start();
+            */
+            //Get IP
+            string ip = (soc.RemoteEndPoint as IPEndPoint).Address.ToString();
+            tasks.Add(Task.Run(() => Server.OutputThread(soc,ip)));
         }
         private static bool IsClientConnected(Socket client)
         {
@@ -187,7 +158,13 @@ namespace server
                 return false;
             return !(client.Poll(1, SelectMode.SelectRead) && client.Available == 0);
         }
-
+        private static int HandleNewSocket(Socket soc)
+        {
+            sockets.Add(soc);
+            StartOutputListener(soc);
+            curHandler.Send(Encoding.ASCII.GetBytes("You are client " + (sockets.Count - 1) + "<EOF>"));
+            return sockets.Count-1;
+        }
         static void StartListening()
         {
 
@@ -207,18 +184,18 @@ namespace server
                 listener.Bind(localEP);
                 listener.Listen(10);
                 BackgroundRun();
+                Console.WriteLine("Waiting for connection... The program will hang until then");
                 //Start listening 
                 while (true)
                 {
-                    Console.WriteLine("Waiting for connection. Program will hang");
                     try
                     {
                         //bruh there's another Socket
                         curHandler = listener.Accept();
-                        sockets.Add(curHandler);
-                        Console.WriteLine("A client connected");
+                        int index = HandleNewSocket(curHandler);
+                        Console.WriteLine("A client connected from " + (curHandler.RemoteEndPoint as IPEndPoint).Address);
                         StartInputListener();
-                        StartOutputListener();
+                        //StartOutputListener(sockets.Count-1);
                     }
                     catch(Exception e)
                     {
